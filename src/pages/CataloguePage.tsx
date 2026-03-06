@@ -160,7 +160,7 @@ function CataloguePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {isLoading
             ? [...Array(9)].map((_, i) => <CardSkeleton key={i} />)
-            : data?.items.map((item) => (
+            : data?.items?.map((item) => (
                 <CatalogueCard
                   key={item.id}
                   item={item}
@@ -172,16 +172,16 @@ function CataloguePage() {
         </div>
 
         {/* Empty */}
-        {!isLoading && data?.items.length === 0 && (
+        {!isLoading && data?.items?.length === 0 && (
           <p className="mt-8 text-center text-xs text-slate-500">
             No items match your filters.
           </p>
         )}
 
         {/* Count */}
-        {!isLoading && (data?.meta.total ?? 0) > 0 && (
+        {!isLoading && (data?.meta?.total ?? 0) > 0 && (
           <p className="mt-4 text-right text-[11px] text-slate-600">
-            {data?.meta.total} items
+            {data?.meta?.total} items
           </p>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { Package, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Calendar } from 'lucide-react';
 import { cn, formatCurrency, formatLeadTime } from '../../lib/utils';
 import { canAddToCart } from '../../lib/businessRules';
 import type { CatalogueItem, PurchaseOrder } from '../../types';
@@ -12,7 +12,7 @@ interface Props {
 
 export function CatalogueCard({ item, draft, isAdding, onAdd }: Props) {
   const blockReason = canAddToCart(item, draft);
-  const alreadyInDraft = draft?.lineItems.some((l) => l.catalogueId === item.id) ?? false;
+  const alreadyInDraft = draft?.lineItems?.some((l) => l.catalogueId === item.id) ?? false;
   const dimmed = blockReason === 'SUPPLIER_MISMATCH';
 
   const buttonConfig = (): { label: string; disabled: boolean; cls: string } => {
@@ -71,11 +71,10 @@ export function CatalogueCard({ item, draft, isAdding, onAdd }: Props) {
       <div className="mt-auto flex items-center justify-between border-t border-slate-700 pt-3">
         <div className="flex items-center gap-3 text-[11px] text-slate-400">
           <span className="flex items-center gap-1">
-            <Package size={11} />
+            <Calendar size={11} />
             <span className="font-mono">{formatLeadTime(item.leadTimeDays)}</span>
           </span>
           <span className="flex items-center gap-1">
-            <Clock size={11} />
             <span className="font-mono font-medium text-slate-200">{formatCurrency(item.priceUsd)}</span>
           </span>
         </div>

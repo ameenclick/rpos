@@ -12,11 +12,8 @@ export function TopBar() {
     <header className="app-surface app-border border-b">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link to="/catalogue" className="flex items-baseline gap-2">
-          <span className="font-mono text-xs tracking-[0.25em] uppercase text-slate-400">
+          <span className="text-sm tracking-[0.25em] font-semibold text-slate-100">
             RPOS
-          </span>
-          <span className="text-sm font-semibold text-slate-100">
-            {import.meta.env.VITE_APP_NAME ?? 'Refinery PO System'}
           </span>
         </Link>
         <nav className="flex items-center gap-2 text-xs font-medium">
