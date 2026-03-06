@@ -160,7 +160,7 @@ function CataloguePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {isLoading
             ? [...Array(9)].map((_, i) => <CardSkeleton key={i} />)
-            : data?.items.map((item) => (
+            : data?.items?.map((item) => (
                 <CatalogueCard
                   key={item.id}
                   item={item}
