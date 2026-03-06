@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "tsc --noEmit && vite build"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",

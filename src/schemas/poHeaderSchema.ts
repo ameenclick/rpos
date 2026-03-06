@@ -16,7 +16,7 @@ export const poHeaderSchema = z.object({
       message: 'Needed-by date must be a future date',
     }),
   paymentTerms: z.enum(['Net 15', 'Net 30', 'Net 45', 'Net 60'], {
-    errorMap: () => ({ message: 'Select a valid payment term' }),
+    error: 'Select a valid payment term',
   }),
 });
 
