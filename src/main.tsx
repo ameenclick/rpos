@@ -35,8 +35,7 @@ const router = createBrowserRouter([
 ]);
 
 async function bootstrap() {
-  // Start MSW only in dev when the env flag is set
-  if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_MSW === 'true') {
+  if (import.meta.env.VITE_ENABLE_MSW === 'true') {
     const { worker } = await import('./mocks/browser');
     await worker.start({ onUnhandledRequest: 'warn' });
   }
