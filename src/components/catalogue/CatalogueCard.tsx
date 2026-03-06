@@ -1,4 +1,4 @@
-import { CheckCircle, XCircle, Loader2, Calendar ,DollarSign } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Calendar } from 'lucide-react';
 import { cn, formatCurrency, formatLeadTime } from '../../lib/utils';
 import { canAddToCart } from '../../lib/businessRules';
 import type { CatalogueItem, PurchaseOrder } from '../../types';
@@ -12,7 +12,7 @@ interface Props {
 
 export function CatalogueCard({ item, draft, isAdding, onAdd }: Props) {
   const blockReason = canAddToCart(item, draft);
-  const alreadyInDraft = draft?.lineItems.some((l) => l.catalogueId === item.id) ?? false;
+  const alreadyInDraft = draft?.lineItems?.some((l) => l.catalogueId === item.id) ?? false;
   const dimmed = blockReason === 'SUPPLIER_MISMATCH';
 
   const buttonConfig = (): { label: string; disabled: boolean; cls: string } => {

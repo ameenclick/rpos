@@ -46,7 +46,7 @@ function POListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Purchase Orders</h1>
-        <span className="font-mono text-[11px] text-slate-500">{data?.meta.total} orders</span>
+        <span className="font-mono text-[11px] text-slate-500">{data?.meta?.total} orders</span>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-700">

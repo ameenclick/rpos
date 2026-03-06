@@ -172,16 +172,16 @@ function CataloguePage() {
         </div>
 
         {/* Empty */}
-        {!isLoading && data?.items.length === 0 && (
+        {!isLoading && data?.items?.length === 0 && (
           <p className="mt-8 text-center text-xs text-slate-500">
             No items match your filters.
           </p>
         )}
 
         {/* Count */}
-        {!isLoading && (data?.meta.total ?? 0) > 0 && (
+        {!isLoading && (data?.meta?.total ?? 0) > 0 && (
           <p className="mt-4 text-right text-[11px] text-slate-600">
-            {data?.meta.total} items
+            {data?.meta?.total} items
           </p>
         )}
       </div>
