@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-border: #334155;
+  --color-text: #f1f0e8;
+  --color-muted: #94a3b8;
+  --color-accent: #f59e0b;
+  --color-danger: #ef4444;
+  --color-success: #10b981;
+  --color-info: #3b82f6;
+}
+
+body {
+  @apply bg-slate-950 text-slate-50;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-surface {
+  background-color: var(--color-surface);
+}
+
+.app-border {
+  border-color: var(--color-border);
+}
+
+.app-muted {
+  color: var(--color-muted);
+}
+
+.app-accent {
+  color: var(--color-accent);
+}
+
