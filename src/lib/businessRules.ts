@@ -12,7 +12,7 @@ export function canAddToCart(
   if (!draft) return null;
   if (draft.status !== 'DRAFT') return 'NOT_DRAFT';
   // Supplier lock: first line item fixes the supplier for the whole PO
-  if (draft.lineItems.length > 0 && draft.supplierId !== item.supplier) {
+  if (draft.lineItems.length > 0 && draft.supplierName !== item.supplier) {
     return 'SUPPLIER_MISMATCH';
   }
   return null;
