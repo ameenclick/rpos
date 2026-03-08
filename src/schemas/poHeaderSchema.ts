@@ -7,8 +7,11 @@ const today = () => {
 };
 
 export const poHeaderSchema = z.object({
-  requestor: z.string().min(2, 'Requestor name must be at least 2 characters'),
-  costCenter: z.string().min(1, 'Cost center is required'),
+  requestor: z.string().min(2, 'Requestor name must be at least 2 characters').max(255),
+  costCenter: z
+    .string()
+    .min(1, 'Cost center is required')
+    .max(100, 'Cost center must be 100 characters or less'),
   neededByDate: z
     .string()
     .min(1, 'Needed-by date is required')
