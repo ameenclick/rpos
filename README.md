@@ -1,6 +1,6 @@
 # Refinery Purchase Order System (RPOS)
 
-A Buyer-facing procurement tool for refinery equipment. Built with React 19, Vite, TypeScript, Zustand, TanStack Query, and MSW.
+A Buyer-facing procurement tool for refinery equipment. Built with React 19, Vite, TypeScript, Zustand, TanStack Query, and **Supabase** (PostgreSQL).
 
 ---
 
@@ -10,12 +10,12 @@ A Buyer-facing procurement tool for refinery equipment. Built with React 19, Vit
 
 - Node.js `>=22.12.0` (or `^20.19.0`)
 - npm `>=10`
+- A [Supabase](https://supabase.com) project (free tier works)
 
 ### Install
 
 ```bash
 npm install
-npx msw init public --save   # only needed once — generates public/mockServiceWorker.js
 ```
 
 ### Environment
@@ -25,20 +25,58 @@ Copy `.env` or create one at the project root:
 ```env
 VITE_API_BASE_URL=/api
 VITE_APP_NAME="Refinery PO System"
-VITE_BUYER_ID=buyer-001
+VITE_SUPABASE_URL=<your-supabase-project-url>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+VITE_BUYER_ID=1
 VITE_BUYER_NAME="Alex Morgan"
-VITE_ENABLE_MSW=true
+VITE_ENABLE_MSW=false
 ```
 
-All variables are prefixed `VITE_` and inlined at build time by Vite.
+| Variable | Purpose |
+|---|---|
+| `VITE_SUPABASE_URL` | Supabase project REST endpoint |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous/public API key |
+| `VITE_BUYER_ID` | Seeded buyer ID (bigint as string) |
+| `VITE_BUYER_NAME` | Display name for the active buyer |
+| `VITE_ENABLE_MSW` | `true` to use in-memory MSW mocks instead of Supabase |
 
-### Dev server
+### Database Setup
+
+Apply migrations and seed data to your Supabase project:
+
+```bash
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+```
+
+Then seed the database (1 buyer, 5 suppliers, 50 catalogue items):
+
+```bash
+npx supabase db execute --file supabase/seed.sql
+```
+
+Alternatively, paste each SQL file into the Supabase Dashboard **SQL Editor** in this order:
+
+1. `supabase/migrations/001_initial_schema.sql` — tables, ENUM, trigger, RLS
+2. `supabase/migrations/002_indexes.sql` — 22+ indexes
+3. `supabase/migrations/003_rpc_functions.sql` — 10 RPCs + helper
+4. `supabase/seed.sql` — initial data
+
+### Dev Server
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:5173`. MSW will intercept all `/api/*` requests in the browser.
+Open `http://localhost:5173`. The app connects directly to Supabase.
+
+To fall back to the in-memory MSW mock backend, set `VITE_ENABLE_MSW=true` and run:
+
+```bash
+npx msw init public --save   # only needed once
+npm run dev
+```
 
 ### Build
 
@@ -55,32 +93,105 @@ npm run preview
 src/
 ├── components/
 │   ├── catalogue/          # CatalogueCard, FilterPanel, SortDropdown, DraftFloatingBadge
-│   ├── layout/             # AppShell (page transitions, Toaster, draft restore notice), TopBar
+│   ├── layout/             # AppShell (page transitions, Toaster, draft restore), TopBar
 │   ├── po/                 # LineItemRow, POHeaderForm, POReview, SupplierMismatchAlert
 │   ├── status/             # StatusBadge, StatusTimeline
 │   └── ui/                 # ConfirmDialog (Radix Dialog), Toaster (Radix Toast)
 ├── hooks/                  # TanStack Query hooks — all async data access lives here
-├── lib/                    # Pure utilities: utils, queryKeys, idempotency, poNumber, businessRules
-├── mocks/                  # MSW handlers (catalogue + procurement), in-memory db, browser worker
+├── lib/
+│   ├── supabase.ts         # Supabase client init (createClient)
+│   ├── supabaseMappers.ts  # snake_case→camelCase, bigint→string, header assembly
+│   ├── idempotency.ts      # Client-side UUID key store for mutation safety
+│   ├── businessRules.ts    # canAddToCart, isValidTransition, canSubmit
+│   ├── queryKeys.ts        # TanStack Query cache key factories
+│   ├── poNumber.ts         # PO number format reference (generation is DB-side)
+│   └── utils.ts            # formatCurrency, formatDate, cn()
+├── mocks/                  # MSW handlers + in-memory db (dev fallback)
 ├── pages/                  # CataloguePage, PODraftPage, POListPage, PODetailPage
-├── schemas/                # Zod schemas for PO header and line item forms
-├── services/               # Thin Axios wrappers (apiClient, catalogueService, procurementService)
+├── schemas/                # Zod schemas: poHeaderSchema, lineItemSchema
+├── services/
+│   ├── catalogueService.ts # Supabase direct queries with nested selects
+│   ├── procurementService.ts # Supabase queries (reads) + RPCs (mutations)
+│   └── apiClient.ts        # Axios instance (only used when MSW fallback is active)
 ├── store/                  # Zustand: authStore, draftStore, toastStore
 ├── types/                  # Shared TypeScript interfaces (index.ts)
-└── main.tsx                # Entrypoint — bootstraps MSW then mounts React
+└── main.tsx                # Entrypoint — conditionally bootstraps MSW, then mounts React
+
+supabase/
+├── migrations/
+│   ├── 001_initial_schema.sql  # 7 tables + ENUM + po_number trigger + RLS
+│   ├── 002_indexes.sql         # 22+ indexes (B-Tree, GIN full-text, composite, partial)
+│   └── 003_rpc_functions.sql   # 10 RPCs + _build_po_response helper
+├── seed.sql                    # 1 buyer, 5 suppliers, 50 catalogue items, 5 sequences
+└── config.toml                 # Supabase CLI project config
 ```
 
-### Data flow
+### Data Flow
+
+**Supabase mode** (default):
 
 ```
 Page / Component
-  └─ TanStack Query hook  (src/hooks/)
-       └─ Axios service   (src/services/)
-            └─ MSW handler (src/mocks/handlers/)
-                 └─ In-memory Map DB (src/mocks/db.ts)
+  └─ TanStack Query hook       (src/hooks/)
+       └─ Service function      (src/services/)
+            ├─ Reads:  supabase.from().select()   → direct PostgREST queries
+            └─ Writes: supabase.rpc()             → SECURITY DEFINER PostgreSQL functions
 ```
 
-### State layers
+**MSW fallback** (`VITE_ENABLE_MSW=true`):
+
+```
+Page / Component
+  └─ TanStack Query hook       (src/hooks/)
+       └─ Axios service         (src/services/apiClient.ts)
+            └─ MSW handler      (src/mocks/handlers/)
+                 └─ In-memory DB (src/mocks/db.ts)
+```
+
+### Database Schema
+
+```
+buyer ─────────────┐
+                    │
+supplier ──┬───────┤
+           │       │
+catalogue ─┤       ├── purchase_order ──┬── po_line_items
+           │       │                    │
+           │       │                    └── po_status_timeline
+           │       │
+           └───────┴── po_sequences
+
+idempotency_cache (standalone, TTL-based)
+```
+
+Key design points:
+- **Bigint PKs** with `GENERATED ALWAYS AS IDENTITY`
+- **Composite foreign keys** on `po_line_items` enforce single-supplier per PO at DB level
+- **`line_total`** is `GENERATED ALWAYS AS (quantity * unit_price) STORED`
+- **`po_number`** generated via `BEFORE INSERT` trigger using a per-supplier sequence
+- **`po_status`** ENUM: `DRAFT → SUBMITTED → APPROVED → FULFILLED` (or `→ REJECTED`)
+- **RLS enabled** on all tables — reads allowed for `anon`, writes via `SECURITY DEFINER` RPCs only
+
+### RPC Functions
+
+All mutations go through PostgreSQL functions to enforce business rules atomically:
+
+| RPC | Purpose |
+|---|---|
+| `rpc_create_draft` | Create PO + line items, validate same supplier |
+| `rpc_add_line` | UPSERT line to draft (increment qty if exists) |
+| `rpc_update_line_qty` | Set quantity on existing line |
+| `rpc_remove_line` | Delete line from draft |
+| `rpc_delete_draft` | Delete entire draft PO (cascades) |
+| `rpc_patch_draft_header` | Save cost_center, needed_by_date, payment_terms |
+| `rpc_submit_po` | DRAFT → SUBMITTED (re-snapshots prices, validates header) |
+| `rpc_approve_po` | SUBMITTED → APPROVED |
+| `rpc_reject_po` | SUBMITTED → REJECTED (notes required) |
+| `rpc_fulfill_po` | APPROVED → FULFILLED (combines delivery ref + notes) |
+
+All idempotent RPCs check an `idempotency_cache` table before executing.
+
+### State Layers
 
 | Layer | Tool | Purpose |
 |---|---|---|
@@ -103,45 +214,44 @@ Page / Component
 
 ---
 
-## Key Design Decisions & Trade-offs
+## Key Design Decisions
 
-### Single-supplier enforcement — UI + MSW
-The supplier lock is enforced in **both** `canAddToCart()` (client, prevents button activation) and the MSW handler (server, returns 409). Neither side is the sole guardian. This matches the system spec requiring dual enforcement.
+### Supabase as persistent backend
+All data is stored in Supabase (PostgreSQL). The services layer uses `@supabase/supabase-js` for direct queries (reads) and `.rpc()` calls (mutations). MSW is preserved as an optional dev fallback controlled by `VITE_ENABLE_MSW`.
 
-### MSW as the only backend
-All data lives in an in-memory `Map` inside the MSW service worker. State resets on every page reload. There is no persistence beyond what Zustand writes to `localStorage` (the active draft only). This is intentional for a demo — a real backend would replace the MSW handlers with no other code changes.
+### Single-supplier enforcement — UI + DB
+The supplier lock is enforced in `canAddToCart()` (client, prevents button activation), in the RPCs (server, raises exception), and via composite foreign keys on `po_line_items` (database, structurally impossible to violate).
 
-### Axios over `fetch`
-Axios was chosen because the idempotency header and typed response pattern is already wired per-service via `withIdempotency()`. Switching to `fetch` would require rebuilding the same wrapper surface.
+### Requestor derived from buyer
+The `requestor` field in the PO header is not stored as a separate column. It is derived from `buyer.name` via JOIN at read time, keeping the data normalized.
 
-### Draft stored in Zustand, not only on the server
-The server (MSW) is the source of truth for the persisted PO. Zustand mirrors line items locally so the catalogue page and floating badge can react instantly without a network round-trip. `setLineItems` is called from mutation `onSuccess` callbacks to keep both in sync.
-
-### Zod schemas reused across forms and handlers
-`poHeaderSchema` and `lineItemSchema` in `src/schemas/` are imported by both `react-hook-form` resolvers and (in principle) MSW handlers, ensuring client validation mirrors server validation without duplication.
-
-### PO number generated server-side only
-`generatePONumber()` is in `src/lib/poNumber.ts` but is only called from the MSW `submit` handler, never from any component. This enforces the rule: never generate `poNumber` on the frontend.
+### PO number generated by DB trigger
+`po_number` is generated on `INSERT` via a `BEFORE INSERT` trigger that increments a per-supplier sequence. Every PO — including drafts — gets a number at creation time.
 
 ### Idempotency key lifecycle
-`getIdempotencyKey(actionKey)` creates a UUID per action and reuses it on retries. `clearIdempotencyKey(actionKey)` is called only after a confirmed success response. If a mutation fails mid-flight, the same key is used on retry so the server can return the cached response without double-executing side effects.
+`getIdempotencyKey(actionKey)` creates a UUID per action and reuses it on retries. `clearIdempotencyKey(actionKey)` is called only after confirmed success. The key is passed as an RPC parameter; the server checks `idempotency_cache` and returns the cached response if found.
+
+### Draft stored in Zustand, not only on the server
+Supabase is the source of truth for the persisted PO. Zustand mirrors line items locally so the catalogue page and floating badge react instantly without a network round-trip. `setLineItems` is called from mutation `onSuccess` callbacks to keep both in sync.
+
+### Frontend validation aligned with DB constraints
+Zod schemas enforce `max()` lengths matching `varchar(N)` limits (e.g., `costCenter ≤ 100`). HTML `maxLength` attributes on textarea/input elements provide immediate feedback. RPCs also `RAISE` on overflow as a safety net.
 
 ---
 
-## Deliverables Checklist
+## Tech Stack
 
-- [x] Vite + React 19 + TypeScript scaffolded with strict mode
-- [x] MSW v2 handlers for all endpoints in the spec with simulated delays
-- [x] 50-item JSON dataset loaded and served via mock catalogue handlers
-- [x] CataloguePage: search + filter + sort + URL param sync + skeleton loading
-- [x] Zustand draft store with `persist` middleware + restore-on-load toast
-- [x] Supplier enforcement: UI dim + 409 mock + blocking `SupplierMismatchAlert`
-- [x] Line management: add, update quantity, remove, live subtotal
-- [x] PODraftPage: 3-step wizard (items → header → review/submit)
-- [x] POListPage: table with status badges + empty state
-- [x] PODetailPage: line items + status timeline with actor names
-- [x] Status transition actions (Approve / Reject with notes Dialog / Fulfill)
-- [x] Industrial UI theme: IBM Plex Mono + DM Sans + amber/slate palette
-- [x] Idempotency key pattern on all mutating requests
-- [x] All TypeScript strict, zero `any`
-- [x] README: setup instructions + architecture decisions + known trade-offs
+| Category | Technology |
+|---|---|
+| Framework | React 19 |
+| Build | Vite 7 |
+| Language | TypeScript (strict) |
+| Backend | Supabase (PostgreSQL) |
+| Server state | TanStack Query v5 |
+| Client state | Zustand v5 |
+| Forms | React Hook Form + Zod |
+| UI primitives | Radix UI (Dialog, Toast, Select, Popover) |
+| Styling | Tailwind CSS 3 |
+| Animation | Framer Motion |
+| Icons | Lucide React |
+| Mock backend | MSW v2 (optional fallback) |
